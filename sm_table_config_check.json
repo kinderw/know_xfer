@@ -1,132 +1,87 @@
 {
-  "Comment": "Simplified state machine to verify that a DynamoDB table (or its pre-deletion config) has no replicas.",
-  "StartAt": "CheckPrimaryTable",
-  "States": {
-    "CheckPrimaryTable": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::aws-sdk:dynamodb.describeTable",
-      "Parameters": {
-        "TableName.$": "$.tableName"
-      },
-      "Catch": [
-        {
-          "ErrorEquals": ["ResourceNotFoundException"],
-          "ResultPath": "$.tableNotFoundError",
-          "Next": "GetConfigHistory"
+    "Comment": "State Machine to Restore DynamoDB Table Ensuring No Orphaned Replicas Exist",
+    "StartAt": "CheckTableExists",
+    "States": {
+      "CheckTableExists": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::aws-sdk:dynamodb:describeTable",
+        "Parameters": {
+          "TableName.$": "$.TableName"
         },
-        {
-          "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.error",
-          "Next": "FailState"
-        }
-      ],
-      "Next": "EvaluatePrimaryReplicas"
-    },
-    "EvaluatePrimaryReplicas": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.Table.ReplicaDescriptions",
-          "IsPresent": true,
-          "Next": "FailDueToReplicas"
-        }
-      ],
-      "Default": "SuccessState"
-    },
-    "GetConfigHistory": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::aws-sdk:configservice.getResourceConfigHistory",
-      "Parameters": {
-        "resourceType": "AWS::DynamoDB::Table",
-        "resourceId.$": "$.tableName",
-        "limit": 2,
-        "chronologicalOrder": "Reverse"
-      },
-      "Next": "ExtractSecondConfig"
-    },
-    "ExtractSecondConfig": {
-      "Type": "Pass",
-      "ResultPath": "$.lastConfig",
-      "Parameters": {
-        "configuration.$": "$.configurationItems[1].configuration"
-      },
-      "Next": "EvaluateConfigForReplicas"
-    },
-    "EvaluateConfigForReplicas": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.lastConfig.ReplicaDescriptions",
-          "IsPresent": true,
-          "Next": "CheckReplicaList"
-        }
-      ],
-      "Default": "SuccessState"
-    },
-    "CheckReplicaList": {
-      "Type": "Map",
-      "ItemsPath": "$.lastConfig.ReplicaDescriptions",
-      "ResultPath": "$.replicaResults",
-      "Iterator": {
-        "StartAt": "CheckReplicaExists",
-        "States": {
-          "CheckReplicaExists": {
-            "Type": "Task",
-            "Resource": "arn:aws:states:::aws-sdk:dynamodb.describeTable",
-            "Parameters": {
-              "TableName.$": "$$.Map.Item.Value.TableName"
-            },
-            "Catch": [
-              {
-                "ErrorEquals": ["ResourceNotFoundException"],
-                "ResultPath": "$.replicaError",
-                "Next": "ReplicaNotFound"
-              },
-              {
-                "ErrorEquals": ["States.ALL"],
-                "ResultPath": "$.replicaError",
-                "Next": "ReplicaNotFound"
-              }
-            ],
-            "Next": "ReplicaFound"
-          },
-          "ReplicaFound": {
-            "Type": "Pass",
-            "Result": { "exists": true },
-            "End": true
-          },
-          "ReplicaNotFound": {
-            "Type": "Pass",
-            "Result": { "exists": false },
-            "End": true
+        "Catch": [
+          {
+            "ErrorEquals": ["DynamoDB.ResourceNotFoundException"],
+            "Next": "CheckAWSConfig"
           }
-        }
+        ],
+        "Next": "CheckReplicasInExistingTable"
       },
-      "Next": "EvaluateReplicaResults"
-    },
-    "EvaluateReplicaResults": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.replicaResults[0].exists",
-          "BooleanEquals": true,
-          "Next": "FailDueToReplicas"
-        }
-      ],
-      "Default": "SuccessState"
-    },
-    "FailDueToReplicas": {
-      "Type": "Fail",
-      "Error": "ReplicasExist",
-      "Cause": "Replicas exist for the table (or existed at deletion time)."
-    },
-    "SuccessState": {
-      "Type": "Succeed"
-    },
-    "FailState": {
-      "Type": "Fail",
-      "Error": "GeneralError",
-      "Cause": "An unexpected error occurred."
+  
+      "CheckReplicasInExistingTable": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.Table.Replicas",
+            "IsPresent": true,
+            "Next": "FailDueToReplicas"
+          }
+        ],
+        "Default": "Success"
+      },
+  
+      "CheckAWSConfig": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::aws-sdk:config:getResourceConfigHistory",
+        "Parameters": {
+          "resourceType": "AWS::DynamoDB::Table",
+          "resourceId.$": "$.TableName",
+          "Limit": 2
+        },
+        "Next": "CheckReplicasInConfig"
+      },
+  
+      "CheckReplicasInConfig": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.configurationItems[1].configuration.Replicas",
+            "IsPresent": true,
+            "Next": "InvokeReplicaCheckLambda"
+          }
+        ],
+        "Default": "Success"
+      },
+  
+      "InvokeReplicaCheckLambda": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:REGION:ACCOUNT_ID:function:ReplicaCheckLambda",
+        "Parameters": {
+          "Replicas.$": "$.configurationItems[1].configuration.Replicas"
+        },
+        "Next": "EvaluateReplicaCheck"
+      },
+  
+      "EvaluateReplicaCheck": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.replicas_exist",
+            "BooleanEquals": true,
+            "Next": "FailDueToReplicas"
+          }
+        ],
+        "Default": "Success"
+      },
+  
+      "FailDueToReplicas": {
+        "Type": "Fail",
+        "Error": "ReplicasExistError",
+        "Cause": "One or more replicas still exist."
+      },
+  
+      "Success": {
+        "Type": "Succeed"
+      }
     }
   }
-}
+  
