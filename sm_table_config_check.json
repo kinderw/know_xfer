@@ -37,26 +37,14 @@
           "resourceId.$": "$.TableName",
           "Limit": 2
         },
-        "Next": "CheckReplicasInConfig"
+        "Next": "InspectConfigAndCheckReplicas"
       },
   
-      "CheckReplicasInConfig": {
-        "Type": "Choice",
-        "Choices": [
-          {
-            "Variable": "$.configurationItems[1].configuration.Replicas",
-            "IsPresent": true,
-            "Next": "InvokeReplicaCheckLambda"
-          }
-        ],
-        "Default": "Success"
-      },
-  
-      "InvokeReplicaCheckLambda": {
+      "InspectConfigAndCheckReplicas": {
         "Type": "Task",
-        "Resource": "arn:aws:lambda:REGION:ACCOUNT_ID:function:ReplicaCheckLambda",
+        "Resource": "arn:aws:lambda:REGION:ACCOUNT_ID:function:InspectAndCheckReplicasLambda",
         "Parameters": {
-          "Replicas.$": "$.configurationItems[1].configuration.Replicas"
+          "ConfigString.$": "$.configurationItems[1].configuration"
         },
         "Next": "EvaluateReplicaCheck"
       },
