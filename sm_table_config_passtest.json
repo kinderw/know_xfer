@@ -1,77 +1,80 @@
 {
-  "Comment": "State Machine to Test AWS Config Response Passing",
-  "StartAt": "CheckTableExists",
-  "States": {
-    "CheckTableExists": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::aws-sdk:dynamodb:describeTable",
-      "Parameters": {
-        "TableName.$": "$.TableName"
+    "Comment": "State Machine to Test AWS Config Response Passing",
+    "StartAt": "CheckTableExists",
+    "States": {
+      "CheckTableExists": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::aws-sdk:dynamodb:describeTable",
+        "Parameters": {
+          "TableName.$": "$.TableName"
+        },
+        "ResultPath": "$.DescribeTableResult",
+        "Catch": [
+          {
+            "ErrorEquals": ["DynamoDB.ResourceNotFoundException"],
+            "Next": "CheckAWSConfig"
+          }
+        ],
+        "Next": "CheckReplicasInExistingTable"
       },
-      "Catch": [
-        {
-          "ErrorEquals": ["DynamoDB.ResourceNotFoundException"],
-          "Next": "CheckAWSConfig"
-        }
-      ],
-      "Next": "CheckReplicasInExistingTable"
-    },
-
-    "CheckReplicasInExistingTable": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.Table.Replicas",
-          "IsPresent": true,
-          "Next": "FailDueToReplicas"
-        }
-      ],
-      "Default": "Success"
-    },
-
-    "CheckAWSConfig": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::aws-sdk:config:getResourceConfigHistory",
-      "Parameters": {
-        "resourceType": "AWS::DynamoDB::Table",
-        "resourceId.$": "$.TableName",
-        "Limit": 2
+  
+      "CheckReplicasInExistingTable": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.DescribeTableResult.Table.Replicas",
+            "IsPresent": true,
+            "Next": "FailDueToReplicas"
+          }
+        ],
+        "Default": "Success"
       },
-      "Next": "PassAWSConfigResponse"
-    },
-
-    "PassAWSConfigResponse": {
-      "Type": "Pass",
-      "ResultPath": "$.TestConfigResponse",
-      "Next": "EvaluateConfigResponse"
-    },
-
-    "EvaluateConfigResponse": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.TestConfigResponse.configurationItems[1].configuration",
-          "IsPresent": true,
-          "Next": "Success"
-        }
-      ],
-      "Default": "FailDueToMissingConfig"
-    },
-
-    "FailDueToReplicas": {
-      "Type": "Fail",
-      "Error": "ReplicasExistError",
-      "Cause": "One or more replicas still exist."
-    },
-
-    "FailDueToMissingConfig": {
-      "Type": "Fail",
-      "Error": "MissingConfigError",
-      "Cause": "Second configuration from AWS Config is missing."
-    },
-
-    "Success": {
-      "Type": "Succeed"
+  
+      "CheckAWSConfig": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::aws-sdk:config:getResourceConfigHistory",
+        "Parameters": {
+          "resourceType": "AWS::DynamoDB::Table",
+          "resourceId.$": "$.TableName",
+          "Limit": 2
+        },
+        "ResultPath": "$.AWSConfigResponse",
+        "Next": "PassAWSConfigResponse"
+      },
+  
+      "PassAWSConfigResponse": {
+        "Type": "Pass",
+        "ResultPath": "$.TestConfigResponse",
+        "Next": "EvaluateConfigResponse"
+      },
+  
+      "EvaluateConfigResponse": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.TestConfigResponse.AWSConfigResponse.configurationItems[1].configuration",
+            "IsPresent": true,
+            "Next": "Success"
+          }
+        ],
+        "Default": "FailDueToMissingConfig"
+      },
+  
+      "FailDueToReplicas": {
+        "Type": "Fail",
+        "Error": "ReplicasExistError",
+        "Cause": "One or more replicas still exist."
+      },
+  
+      "FailDueToMissingConfig": {
+        "Type": "Fail",
+        "Error": "MissingConfigError",
+        "Cause": "Second configuration from AWS Config is missing."
+      },
+  
+      "Success": {
+        "Type": "Succeed"
+      }
     }
   }
-}
+  
