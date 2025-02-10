@@ -12,6 +12,7 @@
         "Catch": [
           {
             "ErrorEquals": ["DynamoDB.ResourceNotFoundException"],
+            "ResultPath": "$.ErrorInfo",
             "Next": "CheckAWSConfig"
           }
         ],
@@ -39,12 +40,6 @@
           "Limit": 2
         },
         "ResultPath": "$.AWSConfigResponse",
-        "Next": "PassAWSConfigResponse"
-      },
-  
-      "PassAWSConfigResponse": {
-        "Type": "Pass",
-        "ResultPath": "$.TestConfigResponse",
         "Next": "EvaluateConfigResponse"
       },
   
@@ -52,7 +47,7 @@
         "Type": "Choice",
         "Choices": [
           {
-            "Variable": "$.TestConfigResponse.AWSConfigResponse.configurationItems[1].configuration",
+            "Variable": "$.AWSConfigResponse.configurationItems[1].configuration",
             "IsPresent": true,
             "Next": "Success"
           }
