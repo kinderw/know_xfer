@@ -1,5 +1,5 @@
 {
-    "Comment": "State Machine to Restore DynamoDB Table Ensuring No Orphaned Replicas Exist",
+    "Comment": "State Machine to Test AWS Config Response Passing",
     "StartAt": "CheckTableExists",
     "States": {
       "CheckTableExists": {
@@ -8,9 +8,11 @@
         "Parameters": {
           "TableName.$": "$.TableName"
         },
+        "ResultPath": "$.DescribeTableResult",
         "Catch": [
           {
             "ErrorEquals": ["DynamoDB.ResourceNotFoundException"],
+            "ResultPath": "$.ErrorInfo",
             "Next": "CheckAWSConfig"
           }
         ],
@@ -21,7 +23,7 @@
         "Type": "Choice",
         "Choices": [
           {
-            "Variable": "$.Table.Replicas",
+            "Variable": "$.DescribeTableResult.Table.Replicas",
             "IsPresent": true,
             "Next": "FailDueToReplicas"
           }
@@ -37,15 +39,17 @@
           "resourceId.$": "$.TableName",
           "Limit": 2
         },
-        "Next": "InspectConfigAndCheckReplicas"
+        "ResultPath": "$.AWSConfigResponse",
+        "Next": "CheckReplicasInLambda"
       },
   
-      "InspectConfigAndCheckReplicas": {
+      "CheckReplicasInLambda": {
         "Type": "Task",
         "Resource": "arn:aws:lambda:REGION:ACCOUNT_ID:function:InspectAndCheckReplicasLambda",
         "Parameters": {
-          "ConfigString.$": "$.configurationItems[1].configuration"
+          "configurationItems.$": "$.AWSConfigResponse.configurationItems"
         },
+        "ResultPath": "$.ReplicaCheckResult",
         "Next": "EvaluateReplicaCheck"
       },
   
@@ -53,7 +57,7 @@
         "Type": "Choice",
         "Choices": [
           {
-            "Variable": "$.replicas_exist",
+            "Variable": "$.ReplicaCheckResult.replicas_exist",
             "BooleanEquals": true,
             "Next": "FailDueToReplicas"
           }
