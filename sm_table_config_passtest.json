@@ -40,6 +40,15 @@
           "Limit": 2
         },
         "ResultPath": "$.AWSConfigResponse",
+        "Next": "ExtractSecondConfig"
+      },
+  
+      "ExtractSecondConfig": {
+        "Type": "Pass",
+        "Parameters": {
+          "SecondConfig.$": "$.AWSConfigResponse.configurationItems[1].configuration"
+        },
+        "ResultPath": "$.ExtractedConfig",
         "Next": "EvaluateConfigResponse"
       },
   
@@ -47,7 +56,7 @@
         "Type": "Choice",
         "Choices": [
           {
-            "Variable": "$.AWSConfigResponse.configurationItems[1].configuration",
+            "Variable": "$.ExtractedConfig.SecondConfig",
             "IsPresent": true,
             "Next": "Success"
           }
