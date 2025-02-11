@@ -4,6 +4,24 @@ from botocore.exceptions import ClientError
 
 from your_module import check_dynamodb_table_exists  # Replace 'your_module' with your file name
 
+
+import boto3
+from botocore.exceptions import ClientError
+
+def check_dynamodb_table_exists(table_name):
+    dynamodb = boto3.client('dynamodb')
+    
+    try:
+        dynamodb.describe_table(TableName=table_name)
+        return True
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            return False
+        else:
+            raise  # Re-raise the exception if it's something other than table not found
+
+
+
 class TestDynamoDBTableCheck(unittest.TestCase):
     @patch('boto3.client')
     def test_table_exists(self, mock_boto_client):
