@@ -88,3 +88,12 @@ def lambda_handler(event, context):
         "statusCode": 200,
         "body": json.dumps(result)
     }
+
+
+
+
+#https://aws.amazon.com/blogs/compute/handling-lambda-functions-idempotency-with-aws-lambda-powertools/
+#https://docs.powertools.aws.dev/lambda/python/latest/utilities/idempotency/
+
+#By combining expires_after_seconds in your IdempotencyConfig and enabling DynamoDB TTL on the expiry attribute, 
+#you ensure old event records eventually drop off.
