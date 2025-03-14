@@ -18,7 +18,8 @@ persistence_layer = DynamoDBPersistenceLayer(table_name="cyber_restore_indempote
 #    and inside that JSON there's a "Records" array with s3 info. 
 #    We'll pick the "sequencer" as the unique ID. 
 config = IdempotencyConfig(
-    event_key_jmespath="Records[0].s3.object.sequencer"
+    event_key_jmespath="Records[0].s3.object.sequencer",
+    expires_after_seconds=72 * 3600  # 72 hours
 )
 
 # 3) Decorate the core logic function

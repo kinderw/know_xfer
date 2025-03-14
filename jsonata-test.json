@@ -1,0 +1,34 @@
+{
+  "StartAt": "ProcessBuckets",
+  "States": {
+    "ProcessBuckets": {
+      "Type": "Map",
+      "ItemsPath": "$.Buckets",
+      "Iterator": {
+        "StartAt": "GetBucketTagging",
+        "States": {
+          "GetBucketTagging": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::aws-sdk:s3:getBucketTagging",
+            "Parameters": {
+              "Bucket.$": "$$.Map.Item.Value"
+            },
+            "ResultPath": "$.BucketTaggingResult",
+            "Next": "CheckTag"
+          },
+          "CheckTag": {
+            "Type": "Pass",
+            "QueryLanguage": "JSONata",
+            "Assign": {
+              "TagExists": "{% $count($.BucketTaggingResult.TagSet[Key='Environment' and Value='Production']) > 0 %}"
+            },
+            "Output": "{% $merge([$states.input, {'TagExists': $TagExists}]) %}",
+            "End": true
+          }
+        }
+      },
+      "ResultPath": "$.ProcessedBuckets",
+      "End": true
+    }
+  }
+}
