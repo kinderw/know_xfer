@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  KMSKeyModificationRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Triggers on specific KMS key modification events and invokes a Lambda function"
+      EventPattern:
+        source:
+          - aws.kms
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - kms.amazonaws.com
+          eventName:
+            - PutKeyPolicy
+            - ScheduleKeyDeletion
+            - CancelKeyDeletion
+            - EnableKey
+            - DisableKey
+            - UpdateKeyDescription
+            - CreateAlias
+            - UpdateAlias
+            - DeleteAlias
+            - EnableKeyRotation
+            - DisableKeyRotation
+            - TagResource
+            - UntagResource
+          requestParameters:
+            keyId:
+              - 1234abcd-12ab-34cd-56ef-1234567890ab
+      State: ENABLED
+      Targets:
+        - Arn: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:YourLambdaFunctionName"
+          Id: "KMSModificationLambdaTarget"

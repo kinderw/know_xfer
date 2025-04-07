@@ -1,0 +1,25 @@
+{
+  "source": ["aws.kms"],
+  "detail-type": ["AWS API Call via CloudTrail"],
+  "detail": {
+    "eventSource": ["kms.amazonaws.com"],
+    "eventName": [
+      "PutKeyPolicy",
+      "ScheduleKeyDeletion",
+      "CancelKeyDeletion",
+      "EnableKey",
+      "DisableKey",
+      "UpdateKeyDescription",
+      "CreateAlias",
+      "UpdateAlias",
+      "DeleteAlias",
+      "EnableKeyRotation",
+      "DisableKeyRotation",
+      "TagResource",
+      "UntagResource"
+    ],
+    "requestParameters": {
+      "keyId": ["1234abcd-12ab-34cd-56ef-1234567890ab"]
+    }
+  }
+}
