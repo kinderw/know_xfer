@@ -1,0 +1,42 @@
+{
+  "Comment": "Restore an EC2 instance with a custom KMS key – Step Functions + JSONata",
+  "StartAt": "GetRestoreMetadata",
+  "States": {
+    "GetRestoreMetadata": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:backup:getRecoveryPointRestoreMetadata",
+      "Parameters": {
+        "BackupVaultName": "your-vault-name",
+        "RecoveryPointArn": "arn:aws:backup:us-west-2:123456789012:recovery-point/your-recovery-point"
+      },
+      "ResultPath": "$.GetRestoreMetadata",
+      "Next": "BuildBlockDeviceMappings"
+    },
+    "BuildBlockDeviceMappings": {
+      "Type": "Pass",
+      "QueryLanguage": "JSONATA",
+      "Output": {
+        "Transformed": {
+          "BlockDeviceMappings": "{% $parse($states.input.GetRestoreMetadata.RestoreMetadata.BlockDeviceMappings) ~> $map(function($v){ {'DeviceName': $v.DeviceName, 'Ebs': { 'Encrypted': true, 'KmsKeyId': 'arn:aws:kms:us-west-2:123456789012:key/your-custom-key' } } }) %}"
+        }
+      },
+      "Next": "StartRestoreJob"
+    },
+    "StartRestoreJob": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:backup:startRestoreJob",
+      "Parameters": {
+        "RecoveryPointArn": "arn:aws:backup:us-west-2:123456789012:recovery-point/your-recovery-point",
+        "IamRoleArn": "arn:aws:iam::123456789012:role/AWSBackupDefaultServiceRole",
+        "ResourceType": "EC2",
+        "Metadata": {
+          "SubnetId": "subnet-0123456789abcdef0",
+          "SecurityGroupIds": ["sg-0123456789abcdef0"],
+          "PrivateIpAddress": "10.0.0.123",
+          "BlockDeviceMappings.$": "$.Transformed.BlockDeviceMappings"
+        }
+      },
+      "End": true
+    }
+  }
+}
